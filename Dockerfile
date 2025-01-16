@@ -29,8 +29,8 @@ RUN go mod tidy
 # Copy the source code into the container
 COPY . .
 
-# Build the Go application
-RUN go build -v -buildvcs=false -o memory-stress .
+# Build the Go application with VCS stamping disabled
+RUN go build -v -buildvcs=false -o /app/memory-stress .
 
 # Stage 2: Create a minimal runtime image
 FROM alpine:latest
@@ -38,13 +38,12 @@ FROM alpine:latest
 # Set the working directory in the runtime image
 WORKDIR /root/
 
-# Copy the built binary from the builder stage
+# Copy the built binary from the builder stage and ensure permissions are set correctly
 COPY --from=builder /app/memory-stress .
 
+# Ensure the copied binary has the correct permissions
 RUN chmod +x /root/memory-stress
 
 # Expose the port the application listens on
 EXPOSE 8888
 
-# Run the application
-CMD ["./memory-stress"]
