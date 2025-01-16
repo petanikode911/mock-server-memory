@@ -7,23 +7,30 @@ RUN apk add --no-cache git
 # Create a non-root user to avoid permission issues
 RUN addgroup -S go && adduser -S go -G go
 
-# Set the working directory to /app and ensure it has correct ownership
+# Set the working directory to /app
 WORKDIR /app
 
-# Set permissions to the /app directory for the go user
+# Add the exception for the directory in Git config
+RUN git config --global --add safe.directory /app
+
+# Copy go.mod and go.sum to the container, and set proper permissions
+COPY go.mod ./
 RUN chown -R go:go /app
 
 # Switch to the go user to avoid running as root
 USER go
 
-# Add the exception for the directory in Git config
-RUN git config --global safe.directory /app
+# Initialize the Go module if it's not already present
+RUN [ ! -f go.mod ] && go mod init || echo "go.mod already initialized"
+
+# Run go mod tidy to ensure dependencies are updated
+RUN go mod tidy
 
 # Copy the source code into the container
 COPY . .
 
 # Build the Go application
-RUN go build -v -o memory-stress .
+RUN go build -v -buildvcs=false -o memory-stress .
 
 # Stage 2: Create a minimal runtime image
 FROM alpine:latest
