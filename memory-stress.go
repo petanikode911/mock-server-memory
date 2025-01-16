@@ -23,6 +23,12 @@ func stressMemory(memorySize int) {
 	}
 }
 
+// Function to reset memory size
+func resetMemory() {
+	// Clear the allocated memory
+	memory = nil
+}
+
 // Echo handler: Responds with an echo of the incoming request
 func echoHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the memory size from query parameters
@@ -52,6 +58,15 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Memory Size Requested: %d bytes\n", memorySize)
 }
 
+// Reset handler: Clears the allocated memory and resets to zero
+func resetHandler(w http.ResponseWriter, r *http.Request) {
+	// Call reset function to clear memory
+	resetMemory()
+
+	// Output that memory has been reset
+	fmt.Fprintf(w, "Memory has been reset to 0 bytes")
+}
+
 // Health check handler: Responds with "OK" if the service is healthy
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	// Respond with a simple "OK" status to indicate health
@@ -68,7 +83,8 @@ func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Set up HTTP handlers
-	http.HandleFunc("/echo", echoHandler)
+	http.HandleFunc("/set", echoHandler)
+	http.HandleFunc("/reset", resetHandler) // Reset memory
 	http.HandleFunc("/healthz", healthCheckHandler)
 	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
 
