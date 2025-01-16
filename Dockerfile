@@ -13,7 +13,7 @@ COPY . /app
 RUN go mod tidy
 
 # Compile the binary
-RUN go build -o /app/mock-server-memory
+RUN go build -v -buildvcs=false -o /app/mock-server-memory
 RUN ls -l /app/mock-server-memory
 
 # Run the app inside distroless
@@ -23,3 +23,4 @@ FROM asia-southeast2-docker.pkg.dev/dogwood-wharf-316804/base-image/distroless-g
 COPY --from=base-golang /app/mock-server-memory mock-server-memory 
 
 CMD ["./memory-stress"]
+
