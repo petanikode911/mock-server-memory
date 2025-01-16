@@ -19,5 +19,8 @@ WORKDIR /root/
 # Copy the built Go binary from the build stage
 COPY --from=build /app/memory-stress .
 
+# Expose the port the application listens on
+EXPOSE 8888
+
 # Set the default command to run the Go application
 CMD ["./memory-stress"]
