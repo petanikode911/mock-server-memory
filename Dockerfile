@@ -4,14 +4,20 @@ FROM golang:1.23-alpine AS builder
 # Install git (needed for Go modules)
 RUN apk add --no-cache git
 
-# Set the working directory in the container
+# Create a non-root user to avoid permission issues
+RUN addgroup -S go && adduser -S go -G go
+
+# Set the working directory to /app and ensure it has correct ownership
 WORKDIR /app
 
-# Copy go.mod and go.sum to the container to leverage Docker cache
-COPY go.mod ./
+# Set permissions to the /app directory for the go user
+RUN chown -R go:go /app
 
-# Run go mod tidy to ensure dependencies are updated
-RUN go mod tidy
+# Switch to the go user to avoid running as root
+USER go
+
+# Add the exception for the directory in Git config
+RUN git config --global safe.directory /app
 
 # Copy the source code into the container
 COPY . .
