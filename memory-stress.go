@@ -56,10 +56,18 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "OK")
 }
 
+// Liveness check handler: A specific endpoint for liveness probe
+func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
+	// Basic liveness check, returning 200 OK
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "Service is alive")
+}
+
 func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/echo", echoHandler)
 	http.HandleFunc("/healthz", healthCheckHandler)
+	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
 
 	// Start the server
 	port := "8888"
