@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"time"
 )
 
 // Global variable to hold the allocated memory
@@ -20,6 +21,15 @@ func stressMemory(memorySize int) {
 	memory = make([]byte, memorySize)
 	for i := 0; i < len(memory); i++ {
 		memory[i] = 1
+	}
+}
+
+// Function to simulate a memory burst to trigger HPA scaling
+func burstMemory() {
+	// Simulate a burst of memory allocation (e.g., 100MB at a time)
+	for i := 0; i < 10; i++ { // Repeat the burst 10 times to increase the load
+		stressMemory(100 * 1024 * 1024)    // Allocate 100MB at once
+		time.Sleep(100 * time.Millisecond) // Small delay to simulate burst
 	}
 }
 
@@ -58,6 +68,15 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Memory Size Requested: %d bytes\n", memorySize)
 }
 
+// Burst handler: Triggers memory burst to simulate a high memory load
+func burstHandler(w http.ResponseWriter, r *http.Request) {
+	// Simulate a burst of memory allocation
+	burstMemory()
+
+	// Output that a memory burst has been triggered
+	fmt.Fprintf(w, "Memory burst triggered to increase load")
+}
+
 // Reset handler: Clears the allocated memory and resets to zero
 func resetHandler(w http.ResponseWriter, r *http.Request) {
 	// Call reset function to clear memory
@@ -83,7 +102,8 @@ func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Set up HTTP handlers
-	http.HandleFunc("/set", echoHandler)
+	http.HandleFunc("/echo", echoHandler)
+	http.HandleFunc("/burst", burstHandler) // Trigger memory burst
 	http.HandleFunc("/reset", resetHandler) // Reset memory
 	http.HandleFunc("/healthz", healthCheckHandler)
 	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
