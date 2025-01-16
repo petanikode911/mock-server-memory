@@ -24,16 +24,22 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to gradually burst memory
-func burstMemoryGradual(targetMemorySize int) {
+// Function to gradually burst memory over a period of time
+func burstMemoryOverTime(targetMemorySize int, duration time.Duration) {
 	currentMemorySize := len(memory)
 	increment := 1024 * 1024 * 5 // 5MB increment (adjust as needed)
+	startTime := time.Now()
 
-	// Gradually allocate memory in small increments
-	for currentMemorySize < targetMemorySize {
+	// Gradually allocate memory over the given duration
+	for currentMemorySize < targetMemorySize && time.Since(startTime) < duration {
 		currentMemorySize += increment
 		stressMemory(currentMemorySize)
 		time.Sleep(time.Second) // Small delay to avoid sudden memory spike
+	}
+
+	// Optionally, ensure the target memory size is reached
+	if currentMemorySize < targetMemorySize {
+		stressMemory(targetMemorySize)
 	}
 }
 
@@ -95,7 +101,7 @@ func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Service is alive")
 }
 
-// Burst handler: Responds to trigger memory burst
+// Burst handler: Responds to trigger memory burst over a 10-minute period
 func burstHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the target memory size from query parameters
 	memorySizeStr := r.URL.Query().Get("memory_size")
@@ -111,16 +117,12 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Trigger memory burst
-	burstMemoryGradual(memorySize)
+	// Trigger memory burst over 10 minutes
+	duration := 10 * time.Minute
+	go burstMemoryOverTime(memorySize, duration)
 
-	// Output system memory stats after burst (for monitoring)
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	fmt.Printf("Alloc: %v, TotalAlloc: %v, Sys: %v, NumGC: %v\n", memStats.Alloc, memStats.TotalAlloc, memStats.Sys, memStats.NumGC)
-
-	// Respond with memory size that was requested
-	fmt.Fprintf(w, "Memory Burst Completed. Requested Size: %d bytes\n", memorySize)
+	// Respond to indicate burst initiation
+	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes over 10 minutes.\n", memorySize)
 }
 
 func main() {
