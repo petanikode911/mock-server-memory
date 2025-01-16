@@ -12,8 +12,16 @@ import (
 // Global variable to hold the allocated memory
 var memory []byte
 
+// Memory limit (64Mi in bytes)
+const memoryLimit = 64 * 1024 * 1024
+
 // Function to allocate or adjust memory size dynamically
 func stressMemory(memorySize int) {
+	// If memorySize exceeds the limit, set it to memoryLimit
+	if memorySize > memoryLimit {
+		memorySize = memoryLimit
+	}
+
 	// Clear the previous memory allocation if necessary
 	memory = nil
 
@@ -26,10 +34,10 @@ func stressMemory(memorySize int) {
 
 // Function to simulate a memory burst to trigger HPA scaling
 func burstMemory() {
-	// Simulate a burst of memory allocation (e.g., 100MB at a time)
-	for i := 0; i < 10; i++ { // Repeat the burst 10 times to increase the load
-		stressMemory(100 * 1024 * 1024)    // Allocate 100MB at once
-		time.Sleep(100 * time.Millisecond) // Small delay to simulate burst
+	// Simulate a burst of memory allocation (e.g., 64Mi at a time, respecting memory limits)
+	for i := 0; i < 5; i++ { // Repeat the burst 5 times to increase the load
+		stressMemory(memoryLimit)          // Allocate 64Mi at once
+		time.Sleep(200 * time.Millisecond) // Small delay to simulate burst
 	}
 }
 
