@@ -11,9 +11,12 @@ import (
 // Global variable to hold the allocated memory
 var memory []byte
 
-// Memory stress function: Allocate memory dynamically based on size
+// Function to allocate or adjust memory size dynamically
 func stressMemory(memorySize int) {
-	// Allocate memory based on the requested size
+	// Clear the previous memory allocation if necessary
+	memory = nil
+
+	// Allocate new memory based on the requested size
 	memory = make([]byte, memorySize)
 	for i := 0; i < len(memory); i++ {
 		memory[i] = 1
