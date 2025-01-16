@@ -12,16 +12,8 @@ import (
 // Global variable to hold the allocated memory
 var memory []byte
 
-// Memory limit (64Mi in bytes)
-const memoryLimit = 64 * 1024 * 1024
-
 // Function to allocate or adjust memory size dynamically
 func stressMemory(memorySize int) {
-	// If memorySize exceeds the limit, set it to memoryLimit
-	if memorySize > memoryLimit {
-		memorySize = memoryLimit
-	}
-
 	// Clear the previous memory allocation if necessary
 	memory = nil
 
@@ -32,12 +24,16 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to simulate a memory burst to trigger HPA scaling
-func burstMemory() {
-	// Simulate a burst of memory allocation (e.g., 64Mi at a time, respecting memory limits)
-	for i := 0; i < 5; i++ { // Repeat the burst 5 times to increase the load
-		stressMemory(memoryLimit)          // Allocate 64Mi at once
-		time.Sleep(200 * time.Millisecond) // Small delay to simulate burst
+// Function to gradually burst memory
+func burstMemoryGradual(targetMemorySize int) {
+	currentMemorySize := len(memory)
+	increment := 1024 * 1024 * 5 // 5MB increment (adjust as needed)
+
+	// Gradually allocate memory in small increments
+	for currentMemorySize < targetMemorySize {
+		currentMemorySize += increment
+		stressMemory(currentMemorySize)
+		time.Sleep(time.Second) // Small delay to avoid sudden memory spike
 	}
 }
 
@@ -76,15 +72,6 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Memory Size Requested: %d bytes\n", memorySize)
 }
 
-// Burst handler: Triggers memory burst to simulate a high memory load
-func burstHandler(w http.ResponseWriter, r *http.Request) {
-	// Simulate a burst of memory allocation
-	burstMemory()
-
-	// Output that a memory burst has been triggered
-	fmt.Fprintf(w, "Memory burst triggered to increase load")
-}
-
 // Reset handler: Clears the allocated memory and resets to zero
 func resetHandler(w http.ResponseWriter, r *http.Request) {
 	// Call reset function to clear memory
@@ -108,13 +95,41 @@ func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Service is alive")
 }
 
+// Burst handler: Responds to trigger memory burst
+func burstHandler(w http.ResponseWriter, r *http.Request) {
+	// Get the target memory size from query parameters
+	memorySizeStr := r.URL.Query().Get("memory_size")
+	if memorySizeStr == "" {
+		http.Error(w, "memory_size query parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert the memory size to an integer
+	memorySize, err := strconv.Atoi(memorySizeStr)
+	if err != nil {
+		http.Error(w, "Invalid memory_size value", http.StatusBadRequest)
+		return
+	}
+
+	// Trigger memory burst
+	burstMemoryGradual(memorySize)
+
+	// Output system memory stats after burst (for monitoring)
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	fmt.Printf("Alloc: %v, TotalAlloc: %v, Sys: %v, NumGC: %v\n", memStats.Alloc, memStats.TotalAlloc, memStats.Sys, memStats.NumGC)
+
+	// Respond with memory size that was requested
+	fmt.Fprintf(w, "Memory Burst Completed. Requested Size: %d bytes\n", memorySize)
+}
+
 func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/burst", burstHandler) // Trigger memory burst
 	http.HandleFunc("/reset", resetHandler) // Reset memory
 	http.HandleFunc("/healthz", healthCheckHandler)
 	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
+	http.HandleFunc("/burst", burstHandler)                      // Memory burst handler
 
 	// Start the server
 	port := "8888"
