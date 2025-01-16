@@ -1,49 +1,25 @@
-# Stage 1: Build the application
-FROM golang:1.23-alpine AS builder
 
-# Install git (needed for Go modules)
-RUN apk add --no-cache git
+FROM --platform=linux/amd64 golang:1.23 AS base-golang
 
-# Create a non-root user to avoid permission issues
-RUN addgroup -S go && adduser -S go -G go
+RUN apt-get update
 
-# Set the working directory to /app
+# Always set workdir into application root
 WORKDIR /app
 
-# Add the exception for the directory in Git config
-RUN git config --global --add safe.directory /app
+# Copy the source code into container for compiling
+COPY . /app
 
-# Copy go.mod and go.sum to the container, and set proper permissions
-COPY go.mod ./
-RUN chown -R go:go /app
-
-# Switch to the go user to avoid running as root
-USER go
-
-# Initialize the Go module if it's not already present
-RUN [ ! -f go.mod ] && go mod init || echo "go.mod already initialized"
-
-# Run go mod tidy to ensure dependencies are updated
+# tidy
 RUN go mod tidy
 
-# Copy the source code into the container
-COPY . .
+# Compile the binary
+RUN go build -o /app/mock-server-memory
+RUN ls -l /app/mock-server-memory
 
-# Build the Go application with VCS stamping disabled
-RUN go build -v -buildvcs=false -o /app/memory-stress .
+# Run the app inside distroless
+FROM asia-southeast2-docker.pkg.dev/dogwood-wharf-316804/base-image/distroless-go
 
-# Stage 2: Create a minimal runtime image
-FROM alpine:latest
+# Copy release binary that already compiled into distroless
+COPY --from=base-golang /app/mock-server-memory mock-server-memory 
 
-# Set the working directory in the runtime image
-WORKDIR /root/
-
-# Copy the built binary from the builder stage and ensure permissions are set correctly
-COPY --from=builder /app/memory-stress .
-
-# Ensure the copied binary has the correct permissions
-RUN chmod +x /root/memory-stress
-
-# Expose the port the application listens on
-EXPOSE 8888
-
+CMD ["./memory-stress"]
