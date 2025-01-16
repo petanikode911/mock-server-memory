@@ -24,29 +24,31 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to gradually burst memory over a period of time
-func burstMemoryOverTime(targetMemorySize int, duration time.Duration) {
+// Function to continuously burst memory over time in a loop
+func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	currentMemorySize := len(memory)
 	increment := 1024 * 1024 * 5 // 5MB increment (adjust as needed)
-	startTime := time.Now()
 
 	// Gradually allocate memory over the given duration
-	for currentMemorySize < targetMemorySize && time.Since(startTime) < duration {
-		currentMemorySize += increment
-		stressMemory(currentMemorySize)
-		time.Sleep(time.Second) // Small delay to avoid sudden memory spike
+	startTime := time.Now()
+
+	for {
+		if time.Since(startTime) > duration {
+			break
+		}
+
+		if currentMemorySize < targetMemorySize {
+			currentMemorySize += increment
+			stressMemory(currentMemorySize)
+			fmt.Printf("Current Memory Size: %d bytes\n", currentMemorySize)
+		}
+
+		// Optionally, you can add a sleep time between memory allocation increments
+		time.Sleep(time.Second)
 	}
 
-	// Optionally, ensure the target memory size is reached
-	if currentMemorySize < targetMemorySize {
-		stressMemory(targetMemorySize)
-	}
-}
-
-// Function to reset memory size
-func resetMemory() {
-	// Clear the allocated memory
-	memory = nil
+	// Ensure we reach the target memory size
+	stressMemory(targetMemorySize)
 }
 
 // Echo handler: Responds with an echo of the incoming request
@@ -81,7 +83,7 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 // Reset handler: Clears the allocated memory and resets to zero
 func resetHandler(w http.ResponseWriter, r *http.Request) {
 	// Call reset function to clear memory
-	resetMemory()
+	memory = nil
 
 	// Output that memory has been reset
 	fmt.Fprintf(w, "Memory has been reset to 0 bytes")
@@ -101,7 +103,7 @@ func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Service is alive")
 }
 
-// Burst handler: Responds to trigger memory burst over a 10-minute period
+// Burst handler: Responds to trigger memory burst in a loop
 func burstHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the target memory size from query parameters
 	memorySizeStr := r.URL.Query().Get("memory_size")
@@ -117,9 +119,9 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Trigger memory burst over 10 minutes
+	// Trigger memory burst in a loop (duration is 10 minutes here)
 	duration := 10 * time.Minute
-	go burstMemoryOverTime(memorySize, duration)
+	go burstMemoryInLoop(memorySize, duration)
 
 	// Respond to indicate burst initiation
 	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes over 10 minutes.\n", memorySize)
