@@ -6,11 +6,16 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
-// Global variable to hold the allocated memory
-var memory []byte
+// Global variables to hold the allocated memory and control burst status
+var (
+	memory       []byte
+	burstRunning bool
+	burstMutex   sync.Mutex
+)
 
 // Function to allocate or adjust memory size dynamically
 func stressMemory(memorySize int) {
@@ -26,6 +31,10 @@ func stressMemory(memorySize int) {
 
 // Function to continuously burst memory over time in a loop
 func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
+	burstMutex.Lock()
+	burstRunning = true
+	burstMutex.Unlock()
+
 	currentMemorySize := len(memory)
 	increment := 1024 * 1024 * 5 // 5MB increment (adjust as needed)
 
@@ -33,6 +42,14 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	startTime := time.Now()
 
 	for {
+		// Stop the burst if requested
+		burstMutex.Lock()
+		if !burstRunning {
+			burstMutex.Unlock()
+			break
+		}
+		burstMutex.Unlock()
+
 		if time.Since(startTime) > duration {
 			break
 		}
@@ -51,42 +68,15 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	stressMemory(targetMemorySize)
 }
 
-// Echo handler: Responds with an echo of the incoming request
+// Echo handler: Prints the current memory size
 func echoHandler(w http.ResponseWriter, r *http.Request) {
-	// Get the memory size from query parameters
-	memorySizeStr := r.URL.Query().Get("memory_size")
-	if memorySizeStr == "" {
-		http.Error(w, "memory_size query parameter is required", http.StatusBadRequest)
-		return
-	}
-
-	// Convert the memory size to an integer
-	memorySize, err := strconv.Atoi(memorySizeStr)
-	if err != nil {
-		http.Error(w, "Invalid memory_size value", http.StatusBadRequest)
-		return
-	}
-
-	// Call the memory stress function with the dynamic memory size
-	stressMemory(memorySize)
-
 	// Output system memory stats (for monitoring)
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	fmt.Printf("Alloc: %v, TotalAlloc: %v, Sys: %v, NumGC: %v\n", memStats.Alloc, memStats.TotalAlloc, memStats.Sys, memStats.NumGC)
 
-	// Echo the request method, URL, and memory stress details
-	fmt.Fprintf(w, "Echo: Method = %s, URL = %s\n", r.Method, r.URL)
-	fmt.Fprintf(w, "Memory Size Requested: %d bytes\n", memorySize)
-}
-
-// Reset handler: Clears the allocated memory and resets to zero
-func resetHandler(w http.ResponseWriter, r *http.Request) {
-	// Call reset function to clear memory
-	memory = nil
-
-	// Output that memory has been reset
-	fmt.Fprintf(w, "Memory has been reset to 0 bytes")
+	// Respond with the current memory size
+	fmt.Fprintf(w, "Current Memory Allocated: %d bytes\n", len(memory))
 }
 
 // Health check handler: Responds with "OK" if the service is healthy
@@ -127,13 +117,23 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes over 10 minutes.\n", memorySize)
 }
 
+// Stop burst handler: Stops the memory burst loop
+func stopBurstHandler(w http.ResponseWriter, r *http.Request) {
+	burstMutex.Lock()
+	burstRunning = false
+	burstMutex.Unlock()
+
+	// Output that the memory burst has been stopped
+	fmt.Fprintf(w, "Memory burst has been stopped")
+}
+
 func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/echo", echoHandler)
-	http.HandleFunc("/reset", resetHandler) // Reset memory
 	http.HandleFunc("/healthz", healthCheckHandler)
 	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
 	http.HandleFunc("/burst", burstHandler)                      // Memory burst handler
+	http.HandleFunc("/stop", stopBurstHandler)                   // Stop memory burst handler
 
 	// Start the server
 	port := "8888"
