@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
-	"time"
 )
 
 // Global variable to hold the allocated memory
@@ -51,12 +49,20 @@ func echoHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Memory Size Requested: %d bytes\n", memorySize)
 }
 
+// Health check handler: Responds with "OK" if the service is healthy
+func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+	// Respond with a simple "OK" status to indicate health
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "OK")
+}
+
 func main() {
-	// Set up HTTP server with echo handler
+	// Set up HTTP handlers
 	http.HandleFunc("/echo", echoHandler)
+	http.HandleFunc("/healthz", healthCheckHandler)
 
 	// Start the server
-	port := "8080"
+	port := "8888"
 	fmt.Println("Starting HTTP server on port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
