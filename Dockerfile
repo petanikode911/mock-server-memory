@@ -13,7 +13,7 @@ COPY . /app
 RUN go mod tidy
 
 # Compile the binary
-RUN go build -v -buildvcs=false -o /app/mock-server-memory
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -v -buildvcs=false -o /app/mock-server-memory
 
 # Run the app inside distroless
 FROM asia-southeast2-docker.pkg.dev/dogwood-wharf-316804/base-image/distroless-go
