@@ -41,6 +41,8 @@ WORKDIR /root/
 # Copy the built binary from the builder stage
 COPY --from=builder /app/memory-stress .
 
+RUN chmod +x /root/memory-stress
+
 # Expose the port the application listens on
 EXPOSE 8888
 
