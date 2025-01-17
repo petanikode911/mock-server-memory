@@ -15,12 +15,12 @@ var (
 	memory       []byte
 	burstRunning bool
 	burstMutex   sync.Mutex
-	maxMemory    = 128 * 1024 * 1024 // 128Mi limit
+	maxMemory    int // Memory limit that can be dynamically set via HTTP
 )
 
 // Function to allocate or adjust memory size dynamically with a cap to maxMemory
 func stressMemory(memorySize int) {
-	// Cap memory to the limit (128 MiB)
+	// Cap memory to the limit
 	if memorySize > maxMemory {
 		fmt.Println("Requested memory exceeds the limit, capping to max memory limit")
 		memorySize = maxMemory
@@ -36,7 +36,7 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to continuously burst memory over time in a loop with backpressure control
+// Function to gradually increase memory over time in a loop with backpressure control
 func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
@@ -130,6 +130,9 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid memory_size value", http.StatusBadRequest)
 		return
 	}
+
+	// Set maxMemory to the memory_size value from the query
+	maxMemory = memorySize
 
 	// Trigger memory burst in a loop (duration is 10 minutes here)
 	duration := 10 * time.Minute
