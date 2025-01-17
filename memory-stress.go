@@ -42,7 +42,7 @@ func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 	burstMutex.Unlock()
 
 	currentMemorySize := len(memory)
-	increment := 1 * 1024 * 1024 // 1 MiB increment (1048576 bytes)
+	increment := 100 * 1024 // 34 KiB increment (approximately 34816 bytes)
 
 	startTime := time.Now()
 
@@ -66,8 +66,7 @@ func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 		}
 
 		// Sleep to avoid instant overload, allowing the system to react
-		time.Sleep(200 * time.Millisecond) // Reduced sleep time for faster memory allocation
-
+		time.Sleep(50 * time.Millisecond) // Reduced sleep time for faster memory allocation
 	}
 
 	// Hold memory at target size for the specified duration
