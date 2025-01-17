@@ -112,7 +112,6 @@ func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Service is alive")
 }
 
-// Burst handler: Responds to trigger memory burst in a loop
 func burstHandler(w http.ResponseWriter, r *http.Request) {
 	// Get the target memory size from query parameters
 	memorySizeStr := r.URL.Query().Get("memory_size")
@@ -143,10 +142,10 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 	// Set maxMemory to the memory_size value from the query
 	maxMemory = memorySize
 
-	// Trigger memory burst in a loop (duration is the time to hold the memory)
+	// Trigger memory burst in a loop asynchronously (duration is the time to hold the memory)
 	go burstMemoryInLoop(memorySize, holdDuration)
 
-	// Respond to indicate burst initiation
+	// Immediately respond to indicate burst initiation without waiting for hold_duration to finish
 	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes for %v.\n", memorySize, holdDuration)
 }
 
