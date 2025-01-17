@@ -15,10 +15,18 @@ var (
 	memory       []byte
 	burstRunning bool
 	burstMutex   sync.Mutex
+	// Cap memory allocation to 128 MiB (memory limit)
+	maxMemory = 128 * 1024 * 1024 // 128 MiB in bytes
 )
 
 // Function to allocate or adjust memory size dynamically
 func stressMemory(memorySize int) {
+	// Cap memory to the limit (128 MiB)
+	if memorySize > maxMemory {
+		fmt.Println("Requested memory exceeds the limit, capping to max memory limit")
+		memorySize = maxMemory
+	}
+
 	// Clear the previous memory allocation if necessary
 	memory = nil
 
@@ -29,7 +37,7 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to continuously burst memory over time in a loop
+// Function to gradually burst memory over time, with backpressure control
 func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
@@ -38,7 +46,6 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	currentMemorySize := len(memory)
 	increment := 1024 * 1024 * 5 // 5MB increment (adjust as needed)
 
-	// Gradually allocate memory over the given duration
 	startTime := time.Now()
 
 	for {
@@ -56,27 +63,43 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 
 		if currentMemorySize < targetMemorySize {
 			currentMemorySize += increment
+			if currentMemorySize > maxMemory {
+				currentMemorySize = maxMemory // Cap to the limit
+			}
 			stressMemory(currentMemorySize)
 			fmt.Printf("Current Memory Size: %d bytes\n", currentMemorySize)
 		}
 
-		// Optionally, you can add a sleep time between memory allocation increments
-		time.Sleep(time.Second)
+		// Sleep to avoid instant overload, allowing the system to react
+		time.Sleep(500 * time.Millisecond)
 	}
 
-	// Ensure we reach the target memory size
+	// Ensure the target memory size is reached, but don't exceed the limit
 	stressMemory(targetMemorySize)
 }
 
-// Echo handler: Prints the current memory size
+// Echo handler: Responds with the current memory size
 func echoHandler(w http.ResponseWriter, r *http.Request) {
-	// Output system memory stats (for monitoring)
+	// Output the current memory usage
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	fmt.Printf("Alloc: %v, TotalAlloc: %v, Sys: %v, NumGC: %v\n", memStats.Alloc, memStats.TotalAlloc, memStats.Sys, memStats.NumGC)
 
-	// Respond with the current memory size
-	fmt.Fprintf(w, "Current Memory Allocated: %d bytes\n", len(memory))
+	// Return the current memory size to the client
+	fmt.Fprintf(w, "Current Memory Size: %d bytes\n", len(memory))
+}
+
+// Reset handler: Clears the allocated memory and resets to zero
+func resetHandler(w http.ResponseWriter, r *http.Request) {
+	burstMutex.Lock()
+	burstRunning = false
+	burstMutex.Unlock()
+
+	// Clear the allocated memory
+	memory = nil
+
+	// Output that memory has been reset
+	fmt.Fprintf(w, "Memory has been reset to 0 bytes")
 }
 
 // Health check handler: Responds with "OK" if the service is healthy
@@ -130,6 +153,7 @@ func stopBurstHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// Set up HTTP handlers
 	http.HandleFunc("/echo", echoHandler)
+	http.HandleFunc("/reset", resetHandler) // Reset memory
 	http.HandleFunc("/healthz", healthCheckHandler)
 	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
 	http.HandleFunc("/burst", burstHandler)                      // Memory burst handler
