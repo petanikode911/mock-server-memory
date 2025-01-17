@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -81,6 +83,12 @@ func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 	stressMemory(targetMemorySize)
 }
 
+func livenessProbeHandler(w http.ResponseWriter, r *http.Request) {
+	// Basic liveness check, returning 200 OK
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "Service is alive")
+}
+
 func main() {
 	// Read maxMemory from environment variable (55Mi)
 	maxMemoryStr := os.Getenv("MAX_MEMORY")
@@ -89,6 +97,14 @@ func main() {
 	}
 	maxMemory, _ = strconv.Atoi(maxMemoryStr)
 
+	// Set up HTTP handlers
+	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
+
 	// Start memory burst simulation (for demonstration, 50Mi target, hold for 2 minutes)
-	burstMemoryInLoop(50*1024*1024, 2*time.Minute)
+	go burstMemoryInLoop(50*1024*1024, 2*time.Minute)
+
+	// Start the server
+	port := "8888"
+	fmt.Println("Starting HTTP server on port", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
