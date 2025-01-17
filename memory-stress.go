@@ -15,11 +15,10 @@ var (
 	memory       []byte
 	burstRunning bool
 	burstMutex   sync.Mutex
-	// Cap memory allocation to 128 MiB (memory limit)
-	maxMemory = 128 * 1024 * 1024 // 128 MiB in bytes
+	maxMemory    = 128 * 1024 * 1024 // 128Mi limit
 )
 
-// Function to allocate or adjust memory size dynamically
+// Function to allocate or adjust memory size dynamically with a cap to maxMemory
 func stressMemory(memorySize int) {
 	// Cap memory to the limit (128 MiB)
 	if memorySize > maxMemory {
@@ -37,7 +36,7 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to gradually burst memory over time, with backpressure control
+// Function to continuously burst memory over time in a loop with backpressure control
 func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
@@ -71,22 +70,22 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 		}
 
 		// Sleep to avoid instant overload, allowing the system to react
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond) // Adjust the sleep duration as needed
 	}
 
 	// Ensure the target memory size is reached, but don't exceed the limit
 	stressMemory(targetMemorySize)
 }
 
-// Echo handler: Responds with the current memory size
+// Echo handler: Responds with the current memory size in use
 func echoHandler(w http.ResponseWriter, r *http.Request) {
-	// Output the current memory usage
+	// Output system memory stats (for monitoring)
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	fmt.Printf("Alloc: %v, TotalAlloc: %v, Sys: %v, NumGC: %v\n", memStats.Alloc, memStats.TotalAlloc, memStats.Sys, memStats.NumGC)
 
-	// Return the current memory size to the client
-	fmt.Fprintf(w, "Current Memory Size: %d bytes\n", len(memory))
+	// Print the current allocated memory size
+	fmt.Fprintf(w, "Current Allocated Memory: %d bytes\n", len(memory))
 }
 
 // Reset handler: Clears the allocated memory and resets to zero
