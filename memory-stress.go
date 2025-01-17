@@ -36,17 +36,18 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to gradually increase memory over time in a loop with backpressure control
+// Function to gradually increase memory over time and then hold it for 30 minutes
 func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
 	burstMutex.Unlock()
 
 	currentMemorySize := len(memory)
-	increment := 1024 * 1024 // 1MB increment (adjust as needed)
+	increment := 34 * 1024 // 34 KiB increment (approximately 34816 bytes)
 
 	startTime := time.Now()
 
+	// Gradually increase memory
 	for {
 		// Stop the burst if requested
 		burstMutex.Lock()
@@ -55,10 +56,6 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 			break
 		}
 		burstMutex.Unlock()
-
-		if time.Since(startTime) > duration {
-			break
-		}
 
 		if currentMemorySize < targetMemorySize {
 			currentMemorySize += increment
@@ -70,8 +67,20 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 		}
 
 		// Sleep to avoid instant overload, allowing the system to react
-		time.Sleep(1 * time.Second) // Adjust the sleep duration to allow for slow increases
+		time.Sleep(1 * time.Second) // Adjust the sleep duration to allow for gradual increases
 	}
+
+	// Hold memory at target size for the remaining time (30 minutes)
+	if time.Since(startTime) < duration {
+		remainingTime := duration - time.Since(startTime)
+		fmt.Printf("Holding memory at %d bytes for %v\n", targetMemorySize, remainingTime)
+		time.Sleep(remainingTime)
+	}
+
+	// Stop the burst after the target time has passed
+	burstMutex.Lock()
+	burstRunning = false
+	burstMutex.Unlock()
 
 	// Ensure the target memory size is reached, but don't exceed the limit
 	stressMemory(targetMemorySize)
@@ -134,12 +143,12 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 	// Set maxMemory to the memory_size value from the query
 	maxMemory = memorySize
 
-	// Trigger memory burst in a loop (duration is 10 minutes here)
-	duration := 10 * time.Minute
+	// Trigger memory burst in a loop (duration is 30 minutes here)
+	duration := 30 * time.Minute
 	go burstMemoryInLoop(memorySize, duration)
 
 	// Respond to indicate burst initiation
-	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes over 10 minutes.\n", memorySize)
+	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes over 30 minutes.\n", memorySize)
 }
 
 // Stop burst handler: Stops the memory burst loop
