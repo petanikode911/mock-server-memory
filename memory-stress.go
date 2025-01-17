@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -36,8 +35,8 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to gradually increase memory over time and then hold it for 30 minutes
-func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
+// Function to gradually increase memory over time and then hold it for the specified duration
+func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
 	burstMutex.Unlock()
@@ -70,9 +69,9 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 		time.Sleep(1 * time.Second) // Adjust the sleep duration to allow for gradual increases
 	}
 
-	// Hold memory at target size for the remaining time (30 minutes)
-	if time.Since(startTime) < duration {
-		remainingTime := duration - time.Since(startTime)
+	// Hold memory at target size for the specified duration
+	if time.Since(startTime) < holdDuration {
+		remainingTime := holdDuration - time.Since(startTime)
 		fmt.Printf("Holding memory at %d bytes for %v\n", targetMemorySize, remainingTime)
 		time.Sleep(remainingTime)
 	}
@@ -84,17 +83,6 @@ func burstMemoryInLoop(targetMemorySize int, duration time.Duration) {
 
 	// Ensure the target memory size is reached, but don't exceed the limit
 	stressMemory(targetMemorySize)
-}
-
-// Echo handler: Responds with the current memory size in use
-func echoHandler(w http.ResponseWriter, r *http.Request) {
-	// Output system memory stats (for monitoring)
-	var memStats runtime.MemStats
-	runtime.ReadMemStats(&memStats)
-	fmt.Printf("Alloc: %v, TotalAlloc: %v, Sys: %v, NumGC: %v\n", memStats.Alloc, memStats.TotalAlloc, memStats.Sys, memStats.NumGC)
-
-	// Print the current allocated memory size
-	fmt.Fprintf(w, "Current Allocated Memory: %d bytes\n", len(memory))
 }
 
 // Reset handler: Clears the allocated memory and resets to zero
@@ -140,15 +128,26 @@ func burstHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the hold duration from query parameters (optional, default is 30 minutes)
+	holdDurationStr := r.URL.Query().Get("hold_duration")
+	holdDuration := 30 * time.Minute // Default to 30 minutes
+	if holdDurationStr != "" {
+		duration, err := strconv.Atoi(holdDurationStr)
+		if err != nil {
+			http.Error(w, "Invalid hold_duration value", http.StatusBadRequest)
+			return
+		}
+		holdDuration = time.Duration(duration) * time.Minute
+	}
+
 	// Set maxMemory to the memory_size value from the query
 	maxMemory = memorySize
 
-	// Trigger memory burst in a loop (duration is 30 minutes here)
-	duration := 30 * time.Minute
-	go burstMemoryInLoop(memorySize, duration)
+	// Trigger memory burst in a loop (duration is the time to hold the memory)
+	go burstMemoryInLoop(memorySize, holdDuration)
 
 	// Respond to indicate burst initiation
-	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes over 30 minutes.\n", memorySize)
+	fmt.Fprintf(w, "Memory burst started. Target Size: %d bytes for %v.\n", memorySize, holdDuration)
 }
 
 // Stop burst handler: Stops the memory burst loop
@@ -163,7 +162,6 @@ func stopBurstHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Set up HTTP handlers
-	http.HandleFunc("/echo", echoHandler)
 	http.HandleFunc("/reset", resetHandler) // Reset memory
 	http.HandleFunc("/healthz", healthCheckHandler)
 	http.HandleFunc("/application/health", livenessProbeHandler) // Liveness probe handler
