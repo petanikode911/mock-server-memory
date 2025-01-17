@@ -2,19 +2,19 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
 
-// Global variables to hold the allocated memory and control burst status
 var (
 	memory       []byte
 	burstRunning bool
 	burstMutex   sync.Mutex
-	maxMemory    int // Memory limit that can be dynamically set via environment variables
+	maxMemory    int // Memory limit from environment variable
 )
 
-// Function to allocate or adjust memory size dynamically with a cap to maxMemory
 func stressMemory(memorySize int) {
 	// Cap memory to the limit
 	if memorySize > maxMemory {
@@ -32,14 +32,13 @@ func stressMemory(memorySize int) {
 	}
 }
 
-// Function to gradually increase memory over time and then hold it for the specified duration
 func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
 	burstMutex.Unlock()
 
 	currentMemorySize := len(memory)
-	increment := 1 * 1024 * 1024 // 1 MiB increment (1048576 bytes)
+	increment := 100 * 1024 // 100 KiB increment
 
 	startTime := time.Now()
 
@@ -63,7 +62,7 @@ func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 		}
 
 		// Sleep to avoid instant overload, allowing the system to react
-		time.Sleep(100 * time.Millisecond) // Reduced sleep time for faster memory allocation
+		time.Sleep(1 * time.Second) // Adjust the sleep duration to allow for gradual increases
 	}
 
 	// Hold memory at target size for the specified duration
@@ -83,9 +82,13 @@ func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 }
 
 func main() {
-	// Set max memory to 128Mi
-	maxMemory = 128 * 1024 * 1024 // 128Mi = 134217728 bytes
+	// Read maxMemory from environment variable (55Mi)
+	maxMemoryStr := os.Getenv("MAX_MEMORY")
+	if maxMemoryStr == "" {
+		maxMemoryStr = "57739264" // Default to 55Mi if not set (55 * 1024 * 1024)
+	}
+	maxMemory, _ = strconv.Atoi(maxMemoryStr)
 
-	// Simulate a burst of memory with a target size of 100 MiB and a hold duration of 2 minutes
-	burstMemoryInLoop(100*1024*1024, 5*time.Minute)
+	// Start memory burst simulation (for demonstration, 50Mi target, hold for 2 minutes)
+	burstMemoryInLoop(50*1024*1024, 2*time.Minute)
 }
