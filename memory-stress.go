@@ -36,13 +36,14 @@ func stressMemory(memorySize int) {
 }
 
 // Function to gradually increase memory over time and then hold it for the specified duration
+// Function to gradually increase memory over time and then hold it for the specified duration
 func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 	burstMutex.Lock()
 	burstRunning = true
 	burstMutex.Unlock()
 
 	currentMemorySize := len(memory)
-	increment := 34 * 1024 // 34 KiB increment (approximately 34816 bytes)
+	increment := 1 * 1024 * 1024 // 1 MiB increment (1048576 bytes)
 
 	startTime := time.Now()
 
@@ -66,7 +67,7 @@ func burstMemoryInLoop(targetMemorySize int, holdDuration time.Duration) {
 		}
 
 		// Sleep to avoid instant overload, allowing the system to react
-		time.Sleep(1 * time.Second) // Adjust the sleep duration to allow for gradual increases
+		time.Sleep(200 * time.Millisecond) // Reduced sleep time for faster memory allocation
 	}
 
 	// Hold memory at target size for the specified duration
